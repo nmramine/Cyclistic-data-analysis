@@ -1,0 +1,237 @@
+---
+title: "Cyclistic Bikes Data analysis"
+output: html_notebook
+author: Amine Nemer
+---
+
+# Business Problem: 
+**How do annual members and casual riders use Cyclistic bikes differently?**
+
+# Statement of Task: 
+
+**Analyze and identify trends and patterns on users behavior for cyclistic.**
+
+# Stakeholders: 
+**Cyclistic**: A bike-share program that features more than 5,800 bicycles and 600 docking stations. Cyclistic sets itself apart by also offering reclining bikes, hand tricycles, and cargo bikes, making bike-share more inclusive to people with disabilities and riders who can’t use a standard two-wheeled bike. The majority of riders opt for traditional bikes; about 8% of riders use the assistive options. 
+
+Cyclistic users are more likely to ride for leisure, but about 30% use them to commute to work each day.
+
+**Lily Moreno**: The director of marketing and your manager. Moreno is responsible for the development of campaigns and initiatives to promote the bike-share program. These may include email, social media, and other channels.
+
+**Cyclistic marketing analytics team**: A team of data analysts who are responsible for collecting, analyzing, and reporting data that helps guide Cyclistic marketing strategy. You joined this team six months ago and have been busy learning about Cyclistic’s mission and business goals — as well as how you, as a junior data analyst, can help Cyclistic achieve them.
+
+**Cyclistic executive team**: The notoriously detail-oriented executive team will decide whether to approve the recommended marketing program.
+
+# Data Sources: 
+
+Motivate International Inc. (“Motivate”) operates the City of Chicago’s (“City”) Divvy bicycle sharing service. Motivate and the City are committed to supporting bicycling as an alternative transportation option. As part of that commitment, the City permits Motivate to make certain Divvy system data owned by the City (“Data”) available to the public.
+
+# Used Tools
+
+**R**: Preparation, cleaning, processing and analyzing data.
+
+**Tableau**: Visualizing data.
+
+# Data manipulation 
+
+The first step is to **install** and **load** libraries: 
+
+```{r}
+install.packages('tidyverse')
+install.packages('ggplot2')
+install.packages('lubridate')
+
+library(tidyverse)
+library(lubridate)
+library(janitor)
+```
+
+
+Now it's time to **import** all the data we need for the analysis: 
+
+```{r}
+December_2020 <- read_csv("202012-divvy-tripdata.csv")
+January_2021 <- read_csv("202101-divvy-tripdata.csv")
+February_2021 <- read_csv("202102-divvy-tripdata.csv")
+March_2021 <- read_csv("202103-divvy-tripdata.csv")
+April_2021 <- read_csv("202104-divvy-tripdata.csv")
+Mai_2021 <- read_csv("202105-divvy-tripdata.csv")
+June_2021 <- read_csv("202106-divvy-tripdata.csv")
+July_2021 <- read_csv("202107-divvy-tripdata.csv")
+August_2021 <- read_csv("202108-divvy-tripdata.csv")
+September_2021 <- read_csv("202109-divvy-tripdata.csv")
+October_2021 <- read_csv("202110-divvy-tripdata.csv")
+November_2021 <- read_csv("202111-divvy-tripdata.csv")
+
+```
+
+
+In order to bind each month dataset into one global dataset, we have to make sure that the columns names are the same for each table. To achieve that we can use **compare_df_cols_same()** function from **"Janitor packages"**. 
+
+If everything is OK, we should see **"TRUE"** as a result.
+
+```{r}
+compare_df_cols_same(December_2020,January_2021, February_2021, March_2021, April_2021, Mai_2021, June_2021, July_2021, August_2021, September_2021, October_2021, November_2021)
+```
+
+
+Now let's bind all datasets together: 
+
+```{r}
+all_trips <- bind_rows(December_2020,January_2021, February_2021, March_2021, April_2021, Mai_2021, June_2021, July_2021, August_2021, September_2021, October_2021, November_2021)
+```
+
+
+Let's check the data: 
+
+```{r}
+head(all_trips)
+```
+
+```{r}
+glimpse(all_trips)
+```
+
+```{r}
+str(all_trips)
+```
+
+
+To better understand bikes usage behavior, it's more suitable to have new columns which contains year date, month date, day date separately.
+
+In order to do that, we must separate data contained in the **"started_at"** column into three new columns **Year**, **month** and **day**.
+
+let's do it: 
+
+```{r}
+all_trips$date <- as_date(all_trips$started_at)
+all_trips$month <- format(as_date(all_trips$date), "%m")
+all_trips$day <- format(as_date(all_trips$date), "%d")
+all_trips$year <- format(as_date(all_trips$date), "%y")
+```
+
+Now, let's add another useful new column
+
+```{r}
+all_trips$day_of_week <- format(as_date(all_trips$date), "%a")
+```
+
+Let's check the data again to make sure everything is OK: 
+
+```{r}
+glimpse(all_trips)
+```
+
+
+Another significantly data we must add to our dataset to improve considerably our understanding of bikes users behavior: is the trip duration.
+
+To be able to do that, we must calculate the time difference between ending date and starting date:  
+
+> Trip_duration = 
+> ended_at - started_at
+
+```{r}
+all_trips$trip_duration <- difftime(all_trips$ended_at, all_trips$started_at, 
+                                       units = "secs")
+
+```
+
+Now let's convert the new data to the numerical format: 
+
+```{r}
+all_trips$trip_duration <- as.numeric(all_trips$trip_duration)
+all_trips$year <- as.numeric(all_trips$year)
+all_trips$month <- as.numeric(all_trips$month)
+all_trips$day <- as.numeric(all_trips$day)
+```
+
+
+Let's remove all trip duration < 60 secs: 
+
+```{r}
+all_trips_v2 <- all_trips[!(all_trips$trip_duration < 60),]
+```
+
+in order to have an idea about trip duration, let's summarize the new column: 
+
+```{r}
+summary(all_trips_v2$trip_duration)
+```
+
+As you can see, we have the minimum trip duration is 60 secs which is correct because we removed all trips under that time. 
+
+we also have the average trip duration which is: 1348 secs, and the maximum trip duration: 3356649 secs.
+
+before we move to visualization in Tableau, it's time to make some useful calculations that can help us figure out how to solve our problem.
+
+
+* What is the maximum trip duration for both users ?
+
+```{r}
+aggregate(all_trips_v2$trip_duration ~ all_trips_v2$member_casual, FUN = max)
+```
+
+
+* What is the average trip duration for each day of week for both members and casuals ?
+
+```{r}
+aggregate(trip_duration ~ member_casual + day_of_week, data = all_trips_v2, mean)
+```
+* What is the total time spend on different type of rideable for both members and casuals ?
+
+```{r}
+aggregate(trip_duration ~ member_casual + rideable_type, data = all_trips_v2, sum)
+```
+
+* How users spend their time on bikes for each month ?
+
+```{r}
+aggregate(trip_duration ~ member_casual + month, data = all_trips_v2, sum)
+```
+Now we have a better idea about trips and user behavior, let's move the visualization with Tableau.
+
+# Data visualization
+
+
+<iframe src="https://public.tableau.com/views/totaltripdurationaverthemonths/Sheet1?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+ 
+ 
+<iframe src="https://public.tableau.com/views/numberofridesmembervscasual/Sheet2?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+ 
+ 
+<iframe src="https://public.tableau.com/views/Numberofridesforeachbiketype/Sheet2?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+
+<iframe src="https://public.tableau.com/views/Howlongusersspendtimeonbikesovertheweek/Sheet2?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+
+<iframe src="https://public.tableau.com/views/Typeofbikesusagebybothmembersandcasuals/Sheet2?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+
+<iframe src="https://public.tableau.com/views/Averagetimespendonbikesbybothmembersandcasuals/Sheet2?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+
+<iframe src="https://public.tableau.com/views/TripdurationandNumberofridesrelationship/Sheet1?:showVizHome=no&:embed=true" width="910" height="600"></iframe>
+
+
+# Key findings: 
+
+**1. Increase in number of rides and trip duration for both users starting from February 2021.**
+
+**2. The most busiest period of the year is from Mai 2021 to October 2021.**
+
+**3. Increase in demand of rides on the weekends (Friday, Staurday and Sunday) for casual users.**
+
+**4. Rides demand is stable for member users on all weekdays**
+
+**5. Casual users take the longest rides with docked bikes.**
+
+**6. Docked bikes usage by member users is nearly 0.**
+
+# Recommandations: 
+
+**1. Create a custom membership for weekends days only.**
+
+**2. Promoting bikes usage for casual users in everyday tasks such shopping and going to supermarkets.**
+
+**3. Add bonus points and discounts for casual users who takes shorter rides.**
+
+**4. Promoting electric bikes usage.**
+
+**5. Schedule bikes and service maintenance before February.** 
